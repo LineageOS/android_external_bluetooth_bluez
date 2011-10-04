@@ -778,7 +778,7 @@ static gboolean control_cb(GIOChannel *chan, GIOCondition cond,
 				packet_size = packet_size + 4;
 			} else if (caps->capability_id == CAP_EVENTS_SUPPORTED_ID) {
 				avrcp->code = CTYPE_STABLE;
-				caps->params.param_len = htons(6);
+				caps->params.param_len = htons(4);
 				operands[0] = 0x2; // Capability Count
 				operands[1] = EVENT_PLAYBACK_STATUS_CHANGED;
 				operands[2] = EVENT_TRACK_CHANGED;
@@ -878,7 +878,7 @@ static gboolean control_cb(GIOChannel *chan, GIOCondition cond,
 			avrcp->code = CTYPE_REJECTED;
 			caps->params.param_len = htons(1);
 			caps->capability_id = ERROR_INVALID_PDU;
-			packet_size += 1;
+			packet_size = sizeof(struct avrcp_caps);
 		}
 	} else {
 		avctp->cr = AVCTP_RESPONSE;
@@ -1912,7 +1912,7 @@ static int send_meta_data(struct control *control, uint8_t trans_id,
 		       mdata->remaining_mdata_len);
 		meta_data_len = possible_len;
 	}
-	params->param_len = htons(meta_data_len);
+	params->param_len = htons(meta_data_len + header_len - sizeof(struct avrcp_params));
 
 	return write(sk, buf, meta_data_len + header_len);
 }
@@ -2013,7 +2013,7 @@ static int send_play_status(struct control *control, uint32_t song_len,
 	set_company_id(params->company_id, IEEEID_BTSIG);
 	params->pdu_id = PDU_GET_PLAY_STATUS_ID;
 	params->packet_type = AVCTP_PACKET_SINGLE;
-	params->param_len = sizeof(status) - sizeof(status.params);
+	params->param_len = htons(sizeof(status) - sizeof(status.params));
 
 	status.song_len = htonl(song_len);
 	status.song_pos = htonl(song_position);
