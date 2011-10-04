@@ -240,8 +240,9 @@ struct avrcp_caps {
 	uint8_t capability_id;
 } __attribute__ ((packed));
 
-struct avrcp_cmd_get_elem_attributes {
-	struct avrcp_caps caps;
+struct avrcp_cmd_get_elem_attributes_req {
+	struct avrcp_params params;
+	uint64_t identifier;
 	uint8_t count;
 	uint32_t attributes[0];
 } __attribute__ ((packed));
@@ -685,7 +686,7 @@ static gboolean control_cb(GIOChannel *chan, GIOCondition cond,
 	unsigned char buf[1024], *operands;
 	struct avctp_header *avctp;
 	struct avrcp_header *avrcp;
-	struct avrcp_caps *caps;
+	struct avrcp_params *params;
 	int ret, packet_size, operand_count, sock;
 	struct meta_data *mdata = control->mdata;
 
@@ -723,7 +724,7 @@ static gboolean control_cb(GIOChannel *chan, GIOCondition cond,
 
 	operands = buf + sizeof(struct avrcp_header);
 	operand_count = ret - sizeof(struct avrcp_header);
-	caps = (struct avrcp_caps *)buf;
+	params = (struct avrcp_params *)buf;
 
 	DBG("AVRCP %s 0x%01X, subunit_type 0x%02X, subunit_id 0x%01X, "
 			"opcode 0x%02X, %d operands",
@@ -765,34 +766,35 @@ static gboolean control_cb(GIOChannel *chan, GIOCondition cond,
 			(avrcp->code == CTYPE_STATUS || avrcp->code == CTYPE_NOTIFY
 			|| avrcp->code == CTYPE_CONTROL) &&
 			avrcp->opcode == OP_VENDORDEPENDENT) {
+		int error_code = -1;
+		struct avrcp_caps *caps = (struct avrcp_caps *) buf;
+		operands = (unsigned char *)caps + sizeof(struct avrcp_caps);
+
 		DBG("Got Vendor Dep opcode");
-		if (caps->params.pdu_id == PDU_GET_CAPABILITY_ID) {
+
+		if (params->pdu_id == PDU_GET_CAPABILITY_ID) {
 			DBG("Pdu id is PDU_GET_CAPABILITY_ID");
 			avctp->cr = AVCTP_RESPONSE;
-			operands = (unsigned char *)caps + sizeof(struct avrcp_caps);
 			if (caps->capability_id == CAP_COMPANY_ID) {
 				avrcp->code = CTYPE_STABLE;
-				caps->params.param_len = htons(5);
+				params->param_len = htons(5);
 				operands[0] = 0x1; // Capability Count
 				set_company_id(operands + 1, IEEEID_BTSIG);
-				packet_size = packet_size + 4;
+				packet_size = sizeof(struct avrcp_caps) + 4;
 			} else if (caps->capability_id == CAP_EVENTS_SUPPORTED_ID) {
 				avrcp->code = CTYPE_STABLE;
-				caps->params.param_len = htons(6);
+				params->param_len = htons(4);
 				operands[0] = 0x2; // Capability Count
 				operands[1] = EVENT_PLAYBACK_STATUS_CHANGED;
 				operands[2] = EVENT_TRACK_CHANGED;
-				packet_size = packet_size + 3;
+				packet_size = sizeof(struct avrcp_caps) + 3;
 			} else {
-				avctp->cr = AVCTP_RESPONSE;
-				avrcp->code = CTYPE_REJECTED;
-				caps->params.param_len = htons(1);
-				caps->capability_id = ERROR_INVALID_PARAMETER;
+				error_code = ERROR_INVALID_PARAMETER;
 			}
-		} else if (caps->params.pdu_id == PDU_GET_ELEMENT_ATTRIBUTES) {
+		} else if (params->pdu_id == PDU_GET_ELEMENT_ATTRIBUTES) {
 			DBG("Pdu id is PDU_GET_ELEMENT_ATTRIBUTES");
-			struct avrcp_cmd_get_elem_attributes *attr =
-				(struct avrcp_cmd_get_elem_attributes *) caps;
+			struct avrcp_cmd_get_elem_attributes_req *attr =
+				(struct avrcp_cmd_get_elem_attributes_req *) params;
 			DBG("Received att_count is %d", attr->count);
 			uint8_t att_count = attr->count;
 			uint8_t att_mask = 0;
@@ -811,23 +813,17 @@ static gboolean control_cb(GIOChannel *chan, GIOCondition cond,
 			DBG("MetaData mask is %d att_count is %d", att_mask, att_count);
 			send_meta_data(control, avctp->transaction, att_mask, att_count);
 			return TRUE;
-		} else if (caps->params.pdu_id == PDU_REQ_CONTINUE_RSP_ID) {
+		} else if (params->pdu_id == PDU_REQ_CONTINUE_RSP_ID) {
 			if (mdata->remaining_mdata_len == 0) {
-				avctp->cr = AVCTP_RESPONSE;
-				avrcp->code = CTYPE_REJECTED;
-				caps->params.param_len = htons(1);
-				caps->capability_id = ERROR_INVALID_PARAMETER;
+				error_code = ERROR_INVALID_PARAMETER;
 			} else {
 				send_meta_data_continue_response(control, avctp->transaction);
 				return TRUE;
 			}
 
-		} else if (caps->params.pdu_id == PDU_ABORT_CONTINUE_RSP_ID) {
+		} else if (params->pdu_id == PDU_ABORT_CONTINUE_RSP_ID) {
 			if (mdata->remaining_mdata_len == 0) {
-				avctp->cr = AVCTP_RESPONSE;
-				avrcp->code = CTYPE_REJECTED;
-				caps->params.param_len = htons(1);
-				caps->capability_id = ERROR_INVALID_PARAMETER;
+				error_code = ERROR_INVALID_PARAMETER;
 			} else {
 				mdata->remaining_mdata_len = 0;
 				g_free(mdata->remaining_mdata);
@@ -835,13 +831,12 @@ static gboolean control_cb(GIOChannel *chan, GIOCondition cond,
 				avctp->cr = AVCTP_RESPONSE;
 				avrcp->code = CTYPE_STABLE;
 			}
-		} else if (caps->params.pdu_id == PDU_RGR_NOTIFICATION_ID) {
+		} else if (params->pdu_id == PDU_RGR_NOTIFICATION_ID) {
 			avctp->cr = AVCTP_RESPONSE;
 			if (caps->capability_id == EVENT_TRACK_CHANGED) {
 				mdata->trans_id_event_track = avctp->transaction;
 				mdata->reg_track_changed = TRUE;
 				avrcp->code = CTYPE_INTERIM;
-				operands = (unsigned char *)caps + sizeof(struct avrcp_caps);
 				int index;
 				if (mdata->current_play_status == STATUS_STOPPED) {
 					for (index = 0; index < 8; index++, operands++)
@@ -850,23 +845,19 @@ static gboolean control_cb(GIOChannel *chan, GIOCondition cond,
 					for (index = 0; index < 8; index++, operands++)
 						*operands = 0x00;
 				}
-				caps->params.param_len = htons(9);
-				packet_size += 4;
+				params->param_len = htons(9);
+				packet_size = sizeof(struct avrcp_caps) + 8;
 			} else if (caps->capability_id == EVENT_PLAYBACK_STATUS_CHANGED) {
 				mdata->trans_id_event_playback = avctp->transaction;
 				mdata->reg_playback_status = TRUE;
 				avrcp->code = CTYPE_INTERIM;
-				caps->params.param_len = htons(2);
-				operands = (unsigned char *)caps + sizeof(struct avrcp_caps);
+				params->param_len = htons(2);
 				*operands = mdata->current_play_status;
-				packet_size -= 3;
+				packet_size = sizeof(struct avrcp_caps) + 1;
 			} else {
-				avctp->cr = AVCTP_RESPONSE;
-				avrcp->code = CTYPE_REJECTED;
-				caps->params.param_len = htons(1);
-				caps->capability_id = ERROR_INVALID_PARAMETER;
+				error_code = ERROR_INVALID_PARAMETER;
 			}
-		} else if (caps->params.pdu_id == PDU_GET_PLAY_STATUS_ID) {
+		} else if (params->pdu_id == PDU_GET_PLAY_STATUS_ID) {
 			g_dbus_emit_signal(control->dev->conn, control->dev->path,
 					AUDIO_CONTROL_INTERFACE, "GetPlayStatus",
 					DBUS_TYPE_INVALID);
@@ -874,11 +865,15 @@ static gboolean control_cb(GIOChannel *chan, GIOCondition cond,
 			mdata->req_get_play_status = TRUE;
 			return TRUE;
 		} else {
+			error_code = ERROR_INVALID_PDU;
+		}
+
+		if (error_code >= 0) {
 			avctp->cr = AVCTP_RESPONSE;
 			avrcp->code = CTYPE_REJECTED;
-			caps->params.param_len = htons(1);
-			caps->capability_id = ERROR_INVALID_PDU;
-			packet_size += 1;
+			params->param_len = htons(1);
+			caps->capability_id = error_code;
+			packet_size = sizeof(struct avrcp_caps);
 		}
 	} else {
 		avctp->cr = AVCTP_RESPONSE;
@@ -1912,7 +1907,7 @@ static int send_meta_data(struct control *control, uint8_t trans_id,
 		       mdata->remaining_mdata_len);
 		meta_data_len = possible_len;
 	}
-	params->param_len = htons(meta_data_len);
+	params->param_len = htons(meta_data_len + header_len - sizeof(struct avrcp_params));
 
 	return write(sk, buf, meta_data_len + header_len);
 }
@@ -1927,6 +1922,8 @@ static int send_notification(struct control *control,
 	struct avrcp_header *avrcp = &params->avrcp;
 	struct avctp_header *avctp = &avrcp->avctp;
 	int len = 0, total_len = 0, sk = g_io_channel_unix_get_fd(control->io);
+
+	memset(&event, 0, sizeof(event));
 
 	avctp->packet_type = AVCTP_PACKET_SINGLE;
 	avctp->cr = AVCTP_RESPONSE;
@@ -2013,7 +2010,7 @@ static int send_play_status(struct control *control, uint32_t song_len,
 	set_company_id(params->company_id, IEEEID_BTSIG);
 	params->pdu_id = PDU_GET_PLAY_STATUS_ID;
 	params->packet_type = AVCTP_PACKET_SINGLE;
-	params->param_len = sizeof(status) - sizeof(status.params);
+	params->param_len = htons(sizeof(status) - sizeof(status.params));
 
 	status.song_len = htonl(song_len);
 	status.song_pos = htonl(song_position);
