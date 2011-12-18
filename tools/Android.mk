@@ -79,7 +79,7 @@ include $(BUILD_EXECUTABLE)
 #
 # hcitool
 #
-
+ifneq($(BOARD_HAVE_BLOOTOOTH_CUSTOM_HCITOOL),true)
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES:= \
@@ -101,7 +101,7 @@ LOCAL_MODULE_TAGS := eng
 LOCAL_MODULE:=hcitool
 
 include $(BUILD_EXECUTABLE)
-
+endif
 #
 # l2ping
 #
