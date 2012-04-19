@@ -1,0 +1,55 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "AAAASn///K4\u003d",
+        "filename": "tools/sdptool.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 1968,
+      "author": {
+        "id": 3169
+      },
+      "writtenOn": "2012-04-19T11:12:41Z",
+      "side": 1,
+      "message": "Note the uint8 type",
+      "revId": "f7df2d3991205bf2664944b7c8ee4661c60a6ccb",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "AAAASn///Kw\u003d",
+        "filename": "tools/sdptool.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 1973,
+      "author": {
+        "id": 3169
+      },
+      "writtenOn": "2012-04-19T11:12:41Z",
+      "side": 1,
+      "message": "Note that this is hard coded as 16 (0x10) in BluetoothMasService.java (\"private static final int PORT_NUM \u003d 16;\")",
+      "revId": "f7df2d3991205bf2664944b7c8ee4661c60a6ccb",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "AAAASn///K0\u003d",
+        "filename": "tools/sdptool.c",
+        "patchSetId": 2
+      },
+      "lineNbr": 2011,
+      "author": {
+        "id": 3169
+      },
+      "writtenOn": "2012-04-19T11:12:41Z",
+      "side": 1,
+      "message": "again, uint 8, as per https://www.bluetooth.org/DocMan/handlers/DownloadDoc.ashx?doc_id\u003d215400.",
+      "revId": "f7df2d3991205bf2664944b7c8ee4661c60a6ccb",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
