@@ -177,6 +177,7 @@
 static DBusConnection *connection = NULL;
 static gchar *input_device_name = NULL;
 static GSList *servers = NULL;
+static gboolean avrcp_quirks_ena = TRUE;
 
 #if __BYTE_ORDER == __LITTLE_ENDIAN
 
@@ -1161,6 +1162,14 @@ int avrcp_register(DBusConnection *conn, const bdaddr_t *src, GKeyFile *config)
 			g_error_free(err);
 		} else
 			master = tmp;
+
+		tmp = g_key_file_get_boolean(config, "AVRCP", "Quirks", &err);
+		if (err) {
+			DBG("audio.conf: %s", err->message);
+			g_error_free(err);
+		} else
+			avrcp_quirks_ena = tmp;
+
 		err = NULL;
 		input_device_name = g_key_file_get_string(config,
 			"AVRCP", "InputDeviceName", &err);
@@ -1606,6 +1615,9 @@ static uint8_t get_avrcp_quirks(struct audio_device *dev)
 	char name[MAX_NAME_LENGTH + 1];
 	uint8_t quirks = 0;
 
+	if (avrcp_quirks_ena == FALSE)
+		return 0;
+
 	device_get_name(dev->btd_dev, name, sizeof(name));
 
 	if (g_str_equal(name, "Ford Audio")) {
@@ -1616,6 +1628,7 @@ static uint8_t get_avrcp_quirks(struct audio_device *dev)
 		 * also resetting USB devices if connected to it.
 		 * To avoid that and allow at least HFP and A2DP to work,
 		 * prevent any AVRCP 1.3 PDUs from being sent.
+		 * 2012 models have it fixed.
 		 */
 		quirks |= QUIRK_NO_CAPABILITIES;
 		quirks |= QUIRK_NO_METADATA;
