@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "AAAAS3//90U\u003d",
+        "filename": "audio/audio.conf",
+        "patchSetId": 2
+      },
+      "lineNbr": 51,
+      "author": {
+        "id": 1063
+      },
+      "writtenOn": "2012-05-16T12:15:52Z",
+      "side": 1,
+      "message": "I don\u0027t think anyone will understand what \u0027Quirks\u0027 means here.\nWhat about a parameter like:\n\nMetadataBlacklist\u003dFord Audio\n\nIn the implementation, you can strstr the parameter for the device name - if it\u0027s found, enable quirks, else leave them disabled.",
+      "revId": "74c96b7352f1f0328a066beb15c9c3a61351dc2e",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
