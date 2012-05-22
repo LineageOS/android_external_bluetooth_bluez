@@ -1,0 +1,38 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "AAAATH///Xg\u003d",
+        "filename": "audio/control.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 180,
+      "author": {
+        "id": 1063
+      },
+      "writtenOn": "2012-05-22T18:57:32Z",
+      "side": 1,
+      "message": "Can you rename that variable to \u0027metadata_black_list\u0027? The whole file is about AVRCP, and the control functions aren\u0027t blacklisted.",
+      "revId": "080c195b4560085248c4a6f0fec1a888f679db8a",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    },
+    {
+      "key": {
+        "uuid": "AAAATH///Xc\u003d",
+        "filename": "audio/control.c",
+        "patchSetId": 5
+      },
+      "lineNbr": 1614,
+      "author": {
+        "id": 1063
+      },
+      "writtenOn": "2012-05-22T18:57:32Z",
+      "side": 1,
+      "message": "_is_metadata_black_listed_",
+      "revId": "080c195b4560085248c4a6f0fec1a888f679db8a",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": false
+    }
+  ]
+}
