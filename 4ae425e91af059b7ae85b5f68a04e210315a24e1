@@ -1,0 +1,9 @@
+Change-Id: I4ae425e91af059b7ae85b5f68a04e210315a24e1
+Code-Review+2: Ricardo Cerqueira <cyanogenmod@cerqueira.org>
+Verified+1: Ricardo Cerqueira <cyanogenmod@cerqueira.org>
+Code-Review+1: Bernhard Rosenkraenzer <Bernhard.Rosenkranzer@linaro.org>
+Submitted-by: Ricardo Cerqueira <cyanogenmod@cerqueira.org>
+Submitted-at: Mon, 11 Jun 2012 04:28:56 +0400
+Reviewed-on: http://review.cyanogenmod.com/17360
+Project: CyanogenMod/android_external_bluetooth_bluez
+Branch: refs/heads/ics
