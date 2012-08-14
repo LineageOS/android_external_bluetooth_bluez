@@ -1,0 +1,10 @@
+Change-Id: I8fb0c1b7bb583fafa3ac8b4fd2d6dc9d5380c7d4
+Code-Review+2: Steve Kondik <shade@chemlab.org>
+Verified+1: Steve Kondik <shade@chemlab.org>
+Code-Review+1: Gary Dezern <garyd9@gmail.com>
+Code-Review+1: Dan P <bikedude880@gmail.com>
+Submitted-by: Steve Kondik <shade@chemlab.org>
+Submitted-at: Wed, 15 Aug 2012 00:53:36 +0400
+Reviewed-on: http://review.cyanogenmod.com/20959
+Project: CyanogenMod/android_external_bluetooth_bluez
+Branch: refs/heads/jellybean
