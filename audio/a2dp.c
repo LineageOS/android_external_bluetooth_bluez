@@ -74,6 +74,9 @@ struct a2dp_sep {
 	gboolean locked;
 	gboolean suspending;
 	gboolean starting;
+#ifdef STE_BT
+	uint16_t default_delay;
+#endif
 };
 
 struct a2dp_setup_cb {
@@ -357,6 +360,23 @@ static void stream_state_changed(struct avdtp_stream *stream,
 					void *user_data)
 {
 	struct a2dp_sep *sep = user_data;
+#ifdef STE_BT
+	struct avdtp *session = sep->session;
+
+	if (!session)
+		session = avdtp_get_session(sep->stream);
+
+	if (session) {
+		struct audio_device *device = a2dp_get_dev(session);
+
+		if (old_state == AVDTP_STATE_STREAMING &&
+				new_state != AVDTP_STATE_STREAMING)
+			ste_qos_disable(device->btd_dev);
+		else if (old_state == AVDTP_STATE_OPEN &&
+				new_state == AVDTP_STATE_STREAMING)
+			ste_qos_enable(device->btd_dev, sep->stream);
+	}
+#endif
 
 	if (new_state != AVDTP_STATE_IDLE)
 		return;
@@ -505,14 +525,17 @@ static gboolean sbc_getcap_ind(struct avdtp *session, struct avdtp_local_sep *se
 	sbc_cap.cap.media_codec_type = A2DP_CODEC_SBC;
 
 #ifdef ANDROID
+#ifdef STE_BT
+	sbc_cap.frequency = SBC_SAMPLING_FREQ_48000;
+#else
 	sbc_cap.frequency = SBC_SAMPLING_FREQ_44100;
+#endif
 #else
 	sbc_cap.frequency = ( SBC_SAMPLING_FREQ_48000 |
 				SBC_SAMPLING_FREQ_44100 |
 				SBC_SAMPLING_FREQ_32000 |
 				SBC_SAMPLING_FREQ_16000 );
 #endif
-
 	sbc_cap.channel_mode = ( SBC_CHANNEL_MODE_JOINT_STEREO |
 					SBC_CHANNEL_MODE_STEREO |
 					SBC_CHANNEL_MODE_DUAL_CHANNEL |
@@ -829,7 +852,9 @@ static void setconf_cfm(struct avdtp *session, struct avdtp_local_sep *sep,
 		sink_new_stream(dev, session, setup->stream);
 	else
 		source_new_stream(dev, session, setup->stream);
-
+#ifdef STE_BT
+	avdtp_set_delay(stream, a2dp_sep->default_delay);
+#endif
 	/* Notify Endpoint */
 	if (a2dp_sep->endpoint) {
 		struct avdtp_service_capability *service;
@@ -1310,7 +1335,12 @@ static struct avdtp_sep_ind endpoint_ind = {
 	.delayreport		= endpoint_delayreport_ind,
 };
 
-static sdp_record_t *a2dp_record(uint8_t type, uint16_t avdtp_ver)
+static sdp_record_t *a2dp_record(uint8_t type, uint16_t avdtp_ver
+#ifdef STE_BT
+						,gboolean delay_reporting)
+#else
+						)
+#endif
 {
 	sdp_list_t *svclass_id, *pfseq, *apseq, *root;
 	uuid_t root_uuid, l2cap_uuid, avdtp_uuid, a2dp_uuid;
@@ -1320,6 +1350,13 @@ static sdp_record_t *a2dp_record(uint8_t type, uint16_t avdtp_ver)
 	sdp_data_t *psm, *version, *features;
 	uint16_t lp = AVDTP_UUID;
 	uint16_t a2dp_ver = 0x0102, feat = 0x000f;
+
+#ifdef STE_BT
+	if (delay_reporting)
+		a2dp_ver = 0x0103;
+	else
+		a2dp_ver = 0x0102;
+#endif
 
 #ifdef ANDROID
 	feat = 0x0001;
@@ -1399,6 +1436,9 @@ int a2dp_register(DBusConnection *conn, const bdaddr_t *src, GKeyFile *config)
 	int mpeg12_srcs = 0, mpeg12_sinks = 0;
 	gboolean source = TRUE, sink = FALSE, socket = TRUE;
 	gboolean delay_reporting = FALSE;
+#ifdef STE_BT
+	uint16_t default_delay = 0;
+#endif
 	char *str;
 	GError *err = NULL;
 	int i;
@@ -1480,6 +1520,16 @@ int a2dp_register(DBusConnection *conn, const bdaddr_t *src, GKeyFile *config)
 		g_free(str);
 	}
 
+#ifdef STE_BT
+	str = g_key_file_get_string(config, "A2DP", "DefaultDelay", &err);
+	if (err) {
+		DBG("audio.conf: %s", err->message);
+		g_clear_error(&err);
+	} else {
+		default_delay = atoi(str);
+		g_free(str);
+	}
+#endif
 proceed:
 	if (!connection)
 		connection = dbus_connection_ref(conn);
@@ -1515,22 +1565,36 @@ proceed:
 	if (source) {
 		for (i = 0; i < sbc_srcs; i++)
 			a2dp_add_sep(src, AVDTP_SEP_TYPE_SOURCE,
-				A2DP_CODEC_SBC, delay_reporting, NULL, NULL);
+				A2DP_CODEC_SBC, delay_reporting,
+#ifdef STE_BT
+				default_delay,
+#endif
+				NULL, NULL);
 
 		for (i = 0; i < mpeg12_srcs; i++)
 			a2dp_add_sep(src, AVDTP_SEP_TYPE_SOURCE,
 					A2DP_CODEC_MPEG12, delay_reporting,
+#ifdef STE_BT
+				default_delay,
+#endif
 					NULL, NULL);
 	}
 	server->sink_enabled = sink;
 	if (sink) {
 		for (i = 0; i < sbc_sinks; i++)
 			a2dp_add_sep(src, AVDTP_SEP_TYPE_SINK,
-				A2DP_CODEC_SBC, delay_reporting, NULL, NULL);
+				A2DP_CODEC_SBC, delay_reporting,
+#ifdef STE_BT
+				default_delay,
+#endif
+                NULL, NULL);
 
 		for (i = 0; i < mpeg12_sinks; i++)
 			a2dp_add_sep(src, AVDTP_SEP_TYPE_SINK,
 					A2DP_CODEC_MPEG12, delay_reporting,
+#ifdef STE_BT
+				    default_delay,
+#endif
 					NULL, NULL);
 	}
 
@@ -1576,6 +1640,9 @@ void a2dp_unregister(const bdaddr_t *src)
 
 struct a2dp_sep *a2dp_add_sep(const bdaddr_t *src, uint8_t type,
 				uint8_t codec, gboolean delay_reporting,
+#ifdef STE_BT
+				uint16_t default_delay,
+#endif
 				struct media_endpoint *endpoint, int *err)
 {
 	struct a2dp_server *server;
@@ -1629,6 +1696,9 @@ proceed:
 	sep->codec = codec;
 	sep->type = type;
 	sep->delay_reporting = delay_reporting;
+#ifdef STE_BT
+	sep->default_delay = default_delay;
+#endif
 
 	if (type == AVDTP_SEP_TYPE_SOURCE) {
 		l = &server->sources;
@@ -1641,7 +1711,12 @@ proceed:
 	if (*record_id != 0)
 		goto add;
 
-	record = a2dp_record(type, server->version);
+	record = a2dp_record(type, server->version
+#ifdef STE_BT
+							delay_reporting);
+#else
+							);
+#endif
 	if (!record) {
 		error("Unable to allocate new service record");
 		avdtp_unregister_sep(sep->lsep);
@@ -1782,6 +1857,11 @@ static gboolean select_sbc_params(struct sbc_codec_cap *cap,
 	cap->cap.media_type = AVDTP_MEDIA_TYPE_AUDIO;
 	cap->cap.media_codec_type = A2DP_CODEC_SBC;
 
+#ifdef STE_BT
+	if (supported->frequency & SBC_SAMPLING_FREQ_48000)
+		cap->frequency = SBC_SAMPLING_FREQ_48000;
+	else
+#endif
 	if (supported->frequency & SBC_SAMPLING_FREQ_44100)
 		cap->frequency = SBC_SAMPLING_FREQ_44100;
 	else if (supported->frequency & SBC_SAMPLING_FREQ_48000)
